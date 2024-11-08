@@ -18,8 +18,8 @@ IMAP_DOMAIN = ""  # not always works
 CLAIM_REWARDS_ONLY = False  # claim tiers rewards only (https://app.getgrass.io/dashboard/referral-program)
 
 STOP_ACCOUNTS_WHEN_SITE_IS_DOWN = True  # stop account for 20 minutes, to reduce proxy traffic usage
-CHECK_POINTS = False  # show point for each account every nearly 10 minutes
-SHOW_LOGS_RARELY = False  # not always show info about actions to decrease pc influence
+CHECK_POINTS = True  # show point for each account every nearly 10 minutes
+SHOW_LOGS_RARELY = True  # not always show info about actions to decrease pc influence
 
 # Mining mode
 MINING_MODE = True  # False - not mine grass, True - mine grass | Remove all True on approve \ register section
@@ -30,7 +30,7 @@ REGISTER_DELAY = (3, 7)
 
 TWO_CAPTCHA_API_KEY = ""
 ANTICAPTCHA_API_KEY = ""
-CAPMONSTER_API_KEY = ""
+CAPMONSTER_API_KEY = "f3c2464d73d8c6c281e2da65803e74e3"
 CAPSOLVER_API_KEY = ""
 CAPTCHAAI_API_KEY = ""
 
@@ -48,5 +48,5 @@ CAPTCHA_PARAMS = {
 ########################################
 
 ACCOUNTS_FILE_PATH = "data/accounts.txt"
-PROXIES_FILE_PATH = "data/proxies.txt"
+PROXIES_FILE_PATH = "data/proxies_test.txt"
 WALLETS_FILE_PATH = "data/wallets.txt"
