@@ -3,10 +3,19 @@ import ctypes
 import random
 import sys
 import traceback
+from threading import Thread
 
 from art import text2art
 from imap_tools import MailboxLoginError
 from termcolor import colored, cprint
+from kivy.app import App
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.button import Button
+from kivy.uix.scrollview import ScrollView
+from kivy.uix.label import Label
+from kivy.core.window import Window
+from kivy.clock import Clock
+from kivy.lang import Builder
 
 from better_proxy import Proxy
 
@@ -20,6 +29,44 @@ from data.config import ACCOUNTS_FILE_PATH, PROXIES_FILE_PATH, REGISTER_ACCOUNT_
     CLAIM_REWARDS_ONLY, APPROVE_EMAIL, APPROVE_WALLET_ON_EMAIL, MINING_MODE, CONNECT_WALLET, \
     WALLETS_FILE_PATH, SEND_WALLET_APPROVE_LINK_TO_EMAIL, SINGLE_IMAP_ACCOUNT, SEMI_AUTOMATIC_APPROVE_LINK
 
+Builder.load_string('''
+<MainScreen>:
+    orientation: 'vertical'
+    padding: 10
+    spacing: 10
+    
+    BoxLayout:
+        size_hint_y: None
+        height: '48dp'
+        spacing: 10
+        
+        Button:
+            id: start_button
+            text: 'Start'
+            on_press: root.start_script()
+        
+        Button:
+            id: stop_button
+            text: 'Stop'
+            on_press: root.stop_script()
+            disabled: True
+    
+    ScrollView:
+        Label:
+            id: log_output
+            size_hint_y: None
+            height: self.texture_size[1]
+            text_size: self.width, None
+            padding: 10, 10
+''')
+
+class LogHandler:
+    def __init__(self, callback):
+        self.callback = callback
+    def write(self, text):
+        self.callback(text)
+    def flush(self):
+        pass
 
 def bot_info(name: str = ""):
     cprint(text2art(name), 'green')
@@ -32,6 +79,52 @@ def bot_info(name: str = ""):
         f"{colored('https://t.me/+tdC-PXRzhnczNDli', color='light_green')}"
     )
 
+class MainScreen(BoxLayout):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.script_running = False
+        self.script_task = None
+        self.loop = None
+        
+        def log_callback(text):
+            self.ids.log_output.text += text
+        
+        sys.stdout = LogHandler(log_callback)
+        sys.stderr = LogHandler(log_callback)
+
+    def start_script(self):
+        if not self.script_running:
+            self.script_running = True
+            self.ids.start_button.disabled = True
+            self.ids.stop_button.disabled = False
+            self.loop = asyncio.new_event_loop()
+            
+            def run_script():
+                asyncio.set_event_loop(self.loop)
+                self.loop.run_until_complete(main())
+                
+            self.script_task = Thread(target=run_script)
+            self.script_task.start()
+
+    def on_stop(self):
+        if hasattr(self.root, 'loop') and self.root.loop:
+            async def cleanup():
+                tasks = [task for task in asyncio.all_tasks(self.root.loop) 
+                        if task is not asyncio.current_task()]
+                for task in tasks:
+                    task.cancel()
+                await asyncio.gather(*tasks, return_exceptions=True)
+                
+            if self.root.loop.is_running():
+                self.root.loop.create_task(cleanup())
+                self.root.loop.stop()
+
+
+
+class GrassApp(App):
+    def build(self):
+        Window.size = (800, 600)
+        return MainScreen()
 
 async def worker_task(_id, account: str, proxy: str = None, wallet: str = None, db: AccountsDB = None):
     consumables = account.split(":")[:3]
@@ -103,8 +196,6 @@ async def worker_task(_id, account: str, proxy: str = None, wallet: str = None, 
         logger.warning(f"{_id} | {e}")
     except MailboxLoginError as e:
         logger.error(f"{_id} | {e}")
-    # except NoProxiesException as e:
-    #     logger.warning(e)
     except EmailApproveLinkNotFoundException as e:
         logger.warning(e)
     except Exception as e:
@@ -112,7 +203,6 @@ async def worker_task(_id, account: str, proxy: str = None, wallet: str = None, 
     finally:
         if grass:
             await grass.session.close()
-
 
 async def main():
     accounts = file_to_list(ACCOUNTS_FILE_PATH)
@@ -170,14 +260,6 @@ async def main():
 
     await db.close_connection()
 
-
 if __name__ == "__main__":
     bot_info("GRASS_AUTO")
-
-    if sys.platform == 'win32':
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-        loop = asyncio.ProactorEventLoop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(main())
-    else:
-        asyncio.run(main())
+    GrassApp().run()
