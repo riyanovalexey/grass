@@ -38,7 +38,19 @@ class Grass(GrassWs, GrassRest, FailureCounter):
         self.db: AccountsDB = db
 
         self.session: aiohttp.ClientSession = aiohttp.ClientSession(trust_env=True,
-                                                                    connector=aiohttp.TCPConnector(ssl=False))
+                                                                    connector=aiohttp.TCPConnector(force_close=True,enable_cleanup_closed=True,ttl_dns_cache=300,ssl=False),
+                                                                    timeout=aiohttp.ClientTimeout(total=60))
+        headers_to_remove = ['Via', 'X-Forwarded-For', 'X-Real-IP', 'Proxy-Connection']
+        for header in headers_to_remove:
+            if header in self.session.headers:
+                del self.session.headers[header]
+
+        self.session.headers.update({
+            'Connection': 'keep-alive',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Sec-Fetch-Mode': 'navigate'
+        })
 
         self.proxies: List[str] = []
         self.is_extra_proxies_left: bool = True

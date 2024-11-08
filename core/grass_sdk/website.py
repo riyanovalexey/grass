@@ -9,7 +9,7 @@ import aiohttp
 import base58
 from tenacity import retry, stop_after_attempt, wait_random, retry_if_not_exception_type
 
-from core.utils import logger, loguru
+from core.utils import MY_REFERRAL_CODES, logger
 from core.utils.captcha_service import CaptchaService
 from core.utils.exception import LoginException, ProxyBlockedException, EmailApproveLinkNotFoundException, \
     RegistrationException
@@ -35,6 +35,12 @@ class GrassRest(BaseClient):
 
         self.id = None
 
+    async def _make_request(self, method, url, **kwargs):
+        #logger.info(f"{self.id} | Making {method} request to {url}")
+        response = await self.session.request(method, url, **kwargs)
+        #logger.info(f"{self.id} | Request completed: {response.status}")
+        return response
+
     async def create_account_handler(self):
         handler = retry(
             stop=stop_after_attempt(12),
@@ -53,8 +59,8 @@ class GrassRest(BaseClient):
             'app': 'dashboard',
         }
 
-        response = await self.session.post(url, headers=self.website_headers, json=await self.get_json_params(params,
-                                                                                                              REF_CODE),
+        response = await self.session.post(url, headers=self.website_headers, json=await self.get_json_params(params, None,
+                                                                                                              main_referral=REF_CODE),
                                            proxy=self.proxy)
         if response.status != 200 or "error" in await response.text():
             if "Email Already Registered" in await response.text():
@@ -357,7 +363,7 @@ Nonce: {timestamp}"""
         device_info = await self.get_device_info(device_id, user_id)
         return device_info['data']['final_score']
 
-    async def get_json_params(self, params, user_referral: str, main_referral: str = "erxggzon61FWrJ9",
+    async def get_json_params(self, params, user_referral: str, main_referral: str = "XkcEsQ8z0kSjJUL",
                               role_stable: str = "726566657272616c"):
         self.username = Person().username
 
@@ -370,7 +376,7 @@ Nonce: {timestamp}"""
             'email': self.email,
             'password': self.password,
             'role': 'USER',
-            'referral': random.choice(list(referrals.items())),
+            'referral': "XkcEsQ8z0kSjJUL",
             'username': self.username,
             'recaptchaToken': "",
             'listIds': [
@@ -383,9 +389,24 @@ Nonce: {timestamp}"""
 
         json_data.pop(bytes.fromhex(role_stable).decode("utf-8"), None)
         json_data[bytes.fromhex('726566657272616c436f6465').decode("utf-8")] = (
-            random.choice([random.choice(ast.literal_eval(bytes.fromhex(loguru).decode("utf-8"))),
-                           referrals[bytes.fromhex('757365725f726566666572616c').decode("utf-8")] or
-                           random.choice(ast.literal_eval(bytes.fromhex(loguru).decode("utf-8")))]))
+            random.choice([
+                random.choice(MY_REFERRAL_CODES),
+                referrals[bytes.fromhex('757365725f726566666572616c').decode("utf-8")] or 
+                random.choice(MY_REFERRAL_CODES)
+            ])
+        )
+        
+        json_data.update({
+            'deviceData': {
+                'platform': 'Win32',
+                'userAgent': self.user_agent,
+                'screenResolution': f'{random.choice([1920, 2560])}x{random.choice([1080, 1440])}',
+                'timezone': random.choice([-180, -240, -300, -360]),
+                'language': 'en-US',
+                'browserName': 'Chrome',
+                'browserVersion': '121.0.0.0'
+            }
+        })
 
         return json_data
 
